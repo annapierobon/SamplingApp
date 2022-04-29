@@ -1,0 +1,80 @@
+library(pacman)
+library(tidyverse)
+library(dplyr)
+library(shiny)
+library(readxl)
+library(DT)
+library(rsconnect)
+#I need to create the user interface to make the app interactive
+
+ui <- fluidPage(
+  
+  #putting a title in
+  titlePanel("Get sample"),
+  
+  #gave it a nice-ish layout because it was messy otherwise
+  sidebarLayout(
+    
+    sidebarPanel(
+      
+      # Selecting the specific input to feed into the code
+      fileInput("file1", "Choose Excel File",
+                accept = c(".xlsx")
+                ),
+      tags$hr(),
+      #checkboxInput("header", "Header", TRUE),
+      numericInput("sample_x", "Select number in desired sample", 1, min=1, max=100),
+      actionButton("start", label =  "Start Sampling! "),
+      tags$hr(),      
+    
+    # Download Button
+    conditionalPanel(condition = "input.start",
+                     downloadButton("downloadData", "Download"))),
+    # The user interface returns the table from the side
+    mainPanel(dataTableOutput('table'))
+  )
+)
+
+
+
+server <- function(input, output) {
+  
+  df1 <- reactive({
+    
+    req(input$file1)
+    inFile <- input$file1
+    p<-read_excel(inFile$datapath, 1, col_names = T)
+    p
+  })
+  
+  n_sample <- reactive({
+    input$sample_x
+  })
+  
+  #Simpla Random Sample
+  
+  p <- eventReactive(input$start, {
+    take_sample <- sample_n(tbl = df1(), size = n_sample(), replace = F)
+    take_sample
+    })
+  
+
+  output$table <- renderDT({
+    p()
+  })
+  
+  # Downloadable csv of selected dataset ----
+  output$downloadData <- downloadHandler(
+    
+      filename = function() {
+        paste("sample-", Sys.Date(), ".xlsx")
+      },
+      content = function(file) {
+        write_xlsx(p(), file)
+      }
+    )
+}
+
+
+# running the whole app
+shinyApp(ui = ui, server = server)
